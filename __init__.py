@@ -32,6 +32,7 @@ NOTE ON REGULAR EXPRESSION HANDLING:
 """
 import time
 from pathlib import Path
+from typing import Optional
 
 from mycroft.audio import wait_while_speaking
 from mycroft.messagebus.message import Message
@@ -43,6 +44,7 @@ from .skill import FaceplateRenderer, get_display_time, LocationNotFoundError, R
 
 MARK_I = "mycroft_mark_1"
 MARK_II = "mycroft_mark_2"
+TEN_SECONDS = 10
 
 
 class TimeSkill(MycroftSkill):
@@ -55,12 +57,12 @@ class TimeSkill(MycroftSkill):
 
     # TODO: define in the base class so it can be accessed by other skills.
     @property
-    def platform(self):
+    def platform(self) -> Optional[str]:
         """Get the platform identifier string
 
         Returns:
-            str: Platform identifier, such as "mycroft_mark_1",
-                 "mycroft_picroft", "mycroft_mark_2".  None for non-standard.
+            Platform identifier (e.g. "mycroft_mark_1", "mycroft_picroft",
+            "mycroft_mark_2") or None for non-standard platform.
         """
         platform = None
         if self.config_core and self.config_core.get("enclosure"):
@@ -79,7 +81,7 @@ class TimeSkill(MycroftSkill):
         return show_time_when_idle
 
     def initialize(self):
-        """Do the things after the constructor bug before logic is executed."""
+        """Do the things after the constructor but before logic is executed."""
         date_time_format.cache(self.lang)
         self._define_event_handlers()
         self._check_mark_i_idle_setting()
@@ -93,15 +95,6 @@ class TimeSkill(MycroftSkill):
         self.add_event(
             "mycroft.speech.recognition.unknown", self.handle_speech_recognition_unknown
         )
-
-    # TODO: Move the Mark I functionality for idle screens into the Home Screen skill
-    def _check_mark_i_idle_setting(self):
-        """Start an event to display the time when idle if the setting is selected.
-
-        This setting is only applicable to the Mark I.
-        """
-        if self.display_when_idle and self.platform == MARK_I:
-            self.schedule_repeating_event(self.display_idle, None, 10, name="IdleTime")
 
     @intent_handler(AdaptIntent().require("query").require("time"))
     def handle_current_time_adapt(self, request: Message):
@@ -158,7 +151,7 @@ class TimeSkill(MycroftSkill):
         Example: "What time will it be in 8 hours?"
         """
         self.settings["show_time"] = True
-        self.schedule_repeating_event(self.display_idle, None, 10, name="IdleTime")
+        self._check_mark_i_idle_setting()
 
     def _handle_future_time(self, request: Message):
         """Respond to a request for the future time.
@@ -198,21 +191,24 @@ class TimeSkill(MycroftSkill):
         else:
             self._respond(response)
 
-    def _handle_location_not_found(self, response):
-        """User requested time in a city not recognized by a Geolocation API call."""
+    def _handle_location_not_found(self, response: Response):
+        """User requested time in a city not recognized by a Geolocation API call.
+
+        Args:
+            response: object used to formulate the response
+        """
         dialog_data = dict(location=response.requested_location)
         self.speak_dialog("location-not-found", dialog_data)
 
     def _respond(self, response: Response):
         """Speak and display the response to the user's request.
 
-        Args
+        Args:
             response: object used to formulate the response
         """
         self._display_time(response)
         self.speak_dialog(response.dialog_name, response.dialog_data, wait=True)
-        time.sleep(10)
-        self._clear_display()
+        self._clear_mark_i_display(delay=TEN_SECONDS)
 
     def _display_time(self, response: Response):
         """Display the time on the appropriate medium for the active platform.
@@ -245,7 +241,7 @@ class TimeSkill(MycroftSkill):
         msg = self.bus.wait_for_response(query)
         return msg and msg.data.get("active_alarms", 0) > 0
 
-    def _display_gui(self, response):
+    def _display_gui(self, response: Response):
         """Display time on a device that supports the Mycroft GUI Framework.
 
         Args:
@@ -254,15 +250,16 @@ class TimeSkill(MycroftSkill):
         self.gui.clear()
         display_time = get_display_time(response.date_time, self.config_core)
         if self.platform == MARK_II:
+            page_name = "time-mark-ii.qml"
             hour, minute = display_time.split(":")
             self.gui["hour"] = hour
             self.gui["minute"] = minute
             if response.geolocation is not None:
                 self.gui["location"] = response.get_display_location()
-            self.gui.show_page("time-mark-ii.qml")
         else:
+            page_name = "time-scalable.qml"
             self.gui["timeString"] = display_time
-            self.gui.show_page("time-scalable.qml")
+        self.gui.show_page(page_name, override_idle=TEN_SECONDS)
 
     def handle_wake_word_detected(self, _):
         """Clear the display on the Mark I when a wake word is detected.
@@ -271,7 +268,7 @@ class TimeSkill(MycroftSkill):
         be visible.
         """
         if self.platform == MARK_I and self.display_when_idle:
-            self._clear_display()
+            self._clear_mark_i_display()
             self.cancel_scheduled_event("IdleTime")
 
     def handle_speak(self, _):
@@ -283,7 +280,7 @@ class TimeSkill(MycroftSkill):
         if self.platform == MARK_I and self.display_when_idle:
             wait_while_speaking()
             time.sleep(5)
-            self.schedule_repeating_event(self.display_idle, None, 10, name="IdleTime")
+            self._check_mark_i_idle_setting()
 
     def handle_speech_recognition_unknown(self, _):
         """After the device is done speaking, restore the time display on the Mark I.
@@ -291,7 +288,21 @@ class TimeSkill(MycroftSkill):
         This allows for the Mark I's "mouth" to speak the response to a query before
         returning to the idle screen.
         """
-        self.schedule_repeating_event(self.display_idle, None, 10, name="IdleTime")
+        self._check_mark_i_idle_setting()
+
+    # TODO: Move the Mark I functionality for idle screens into the Home Screen skill
+    def _check_mark_i_idle_setting(self):
+        """Start an event to display the time when idle if the setting is selected.
+
+        This setting is only applicable to the Mark I.
+        """
+        if self.display_when_idle and self.platform == MARK_I:
+            self.schedule_repeating_event(
+                self.display_idle,
+                when=now_local(),
+                frequency=TEN_SECONDS,
+                name="IdleTime",
+            )
 
     # TODO: move to home screen skill
     def display_idle(self):
@@ -304,16 +315,19 @@ class TimeSkill(MycroftSkill):
                 self._display_mark_i(display_time)
                 self.enclosure.display_manager.remove_active()
 
-    def _clear_display(self):
-        """After the time has been displayed, clear the display medium."""
+    def _clear_mark_i_display(self, delay=0):
+        """After the time has been displayed, clear the Mark I faceplate.
+
+        Args:
+            delay: the number of seconds to wait before clearing the faceplate.
+        """
         if self.platform == MARK_I:
+            time.sleep(delay)
             self.enclosure.mouth_reset()
             self.enclosure.activate_mouth_events()
             self.enclosure.display_manager.remove_active()
-        elif self.gui.connected:
-            self.gui.release()
 
-    def load_regex_files(self, root_directory):
+    def load_regex_files(self, root_directory: str):
         """Skip this logic to handle the location regular expression in the skill.
 
         See note in module-level docstring.
