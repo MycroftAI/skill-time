@@ -247,7 +247,6 @@ class TimeSkill(MycroftSkill):
         Args:
             response: object used to formulate the response
         """
-        self.gui.clear()
         display_time = get_display_time(response.date_time, self.config_core)
         if self.platform == MARK_II:
             page_name = "time-mark-ii.qml"
