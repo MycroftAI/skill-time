@@ -208,7 +208,10 @@ class TimeSkill(MycroftSkill):
         """
         self._display_time(response)
         self.speak_dialog(response.dialog_name, response.dialog_data, wait=True)
-        self._clear_mark_i_display(delay=TEN_SECONDS)
+        if self.platform == MARK_I:
+            self._clear_mark_i_display(delay=TEN_SECONDS)
+        elif self.gui.connected:
+            self.gui.clear()
 
     def _display_time(self, response: Response):
         """Display the time on the appropriate medium for the active platform.
@@ -258,7 +261,7 @@ class TimeSkill(MycroftSkill):
         else:
             page_name = "time-scalable.qml"
             self.gui["timeString"] = display_time
-        self.gui.show_page(page_name, override_idle=TEN_SECONDS)
+        self.gui.show_page(page_name, override_idle=True)
 
     def handle_wake_word_detected(self, _):
         """Clear the display on the Mark I when a wake word is detected.
