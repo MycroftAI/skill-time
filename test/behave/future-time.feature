@@ -3,7 +3,7 @@ Feature: Future time
   Scenario Outline: what's the future time in the device's local time zone
     Given an english speaking user
      When the user says "<local future time request>"
-     Then "mycroft-date-time" should reply with dialog from "time-future-local.dialog"
+     Then "time" should reply with dialog from "time-future-local.dialog"
 
   Examples:
     | local future time request |
@@ -23,7 +23,7 @@ Feature: Future time
   Scenario Outline: what's the future time in a location
     Given an english speaking user
      When the user says "<future time request for location>"
-     Then "mycroft-date-time" should reply with dialog from "time-future-location.dialog"
+     Then "time" should reply with dialog from "time-future-location.dialog"
 
   Examples:
      | future time request for location |
@@ -38,7 +38,7 @@ Feature: Future time
   Scenario Outline: what's the future time in an imaginary location
     Given an english speaking user
      When the user says "<future time in location request>"
-     Then "mycroft-date-time" should reply with dialog from "location-not-found.dialog"
+     Then "time" should reply with dialog from "location-not-found.dialog"
 
   Examples: what time examples
     | future time in location request |
