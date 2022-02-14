@@ -216,7 +216,7 @@ class TimeSkill(MycroftSkill):
         if self.platform == MARK_I:
             self._clear_mark_i_display(delay=TEN_SECONDS)
         elif self.gui.connected:
-            self.gui.clear()
+            self.gui.release()
 
     def _display_time(self, response: Response):
         """Display the time on the appropriate medium for the active platform.
