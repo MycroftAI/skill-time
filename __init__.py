@@ -329,7 +329,7 @@ class TimeSkill(MycroftSkill):
             self.enclosure.activate_mouth_events()
             self.enclosure.display_manager.remove_active()
 
-    def load_regex_files(self, root_directory: str):
+    def load_regex_files(self):
         """Skip this logic to handle the location regular expression in the skill.
 
         See note in module-level docstring.
