@@ -103,7 +103,8 @@ class TimeSkill(MycroftSkill):
         Args:
             request: Data from the intent parser regarding the user's voice request.
         """
-        self._handle_current_time(request)
+        with self.activity():
+            self._handle_current_time(request)
 
     @intent_handler("what-time-is-it.intent")
     def handle_current_time_padatious(self, request: Message):
@@ -114,7 +115,8 @@ class TimeSkill(MycroftSkill):
         Args:
             request: Data from the intent parser regarding the user's voice request.
         """
-        self._handle_current_time(request)
+        with self.activity():
+            self._handle_current_time(request)
 
     @intent_handler(
         AdaptIntent("")
@@ -131,7 +133,8 @@ class TimeSkill(MycroftSkill):
         Args:
             request: Data from the intent parser regarding the user's voice request.
         """
-        self._handle_future_time(request)
+        with self.activity():
+            self._handle_future_time(request)
 
     @intent_handler("what-time-will-it-be.intent")
     def handle_future_time_padatious(self, request: Message):
@@ -142,7 +145,8 @@ class TimeSkill(MycroftSkill):
         Args:
             request: Data from the intent parser regarding the user's voice request.
         """
-        self._handle_future_time(request)
+        with self.activity():
+            self._handle_future_time(request)
 
     @intent_handler(AdaptIntent("mark-one-idle").require("display").require("time"))
     def handle_show_time(self, _):
@@ -150,8 +154,9 @@ class TimeSkill(MycroftSkill):
 
         Example: "What time will it be in 8 hours?"
         """
-        self.settings["show_time"] = True
-        self._check_mark_i_idle_setting()
+        with self.activity():
+            self.settings["show_time"] = True
+            self._check_mark_i_idle_setting()
 
     def _handle_future_time(self, request: Message):
         """Respond to a request for the future time.
@@ -211,7 +216,7 @@ class TimeSkill(MycroftSkill):
         if self.platform == MARK_I:
             self._clear_mark_i_display(delay=TEN_SECONDS)
         elif self.gui.connected:
-            self.gui.clear()
+            self.gui.release()
 
     def _display_time(self, response: Response):
         """Display the time on the appropriate medium for the active platform.
