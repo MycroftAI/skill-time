@@ -31,6 +31,7 @@ NOTE ON REGULAR EXPRESSION HANDLING:
     leaving only the city to match the regular expression looking for a location.
 """
 import time
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
 
@@ -87,6 +88,9 @@ class TimeSkill(MycroftSkill):
         self._check_mark_i_idle_setting()
         if self.platform != MARK_I:
             self.disable_intent("mark-one-idle")
+
+        self._current_time_cache_key = f"{self.skill_id}.current-time"
+        self.schedule_event(self._cache_current_time_tts, when=1, name="CacheTTS")
 
     def _define_event_handlers(self):
         """Define the events this skill will handle and the associated callback."""
@@ -194,7 +198,13 @@ class TimeSkill(MycroftSkill):
         except LocationNotFoundError:
             self._handle_location_not_found(response)
         else:
-            self._respond(response)
+            cache_key = (
+                self._current_time_cache_key
+                if not response.requested_location
+                else None
+            )
+            self._respond(response, cache_key=cache_key)
+            self._cache_current_time_tts()
 
     def _handle_location_not_found(self, response: Response):
         """User requested time in a city not recognized by a Geolocation API call.
@@ -205,14 +215,16 @@ class TimeSkill(MycroftSkill):
         dialog_data = dict(location=response.requested_location)
         self.speak_dialog("location-not-found", dialog_data)
 
-    def _respond(self, response: Response):
+    def _respond(self, response: Response, cache_key=None):
         """Speak and display the response to the user's request.
 
         Args:
             response: object used to formulate the response
         """
         self._display_time(response)
-        self.speak_dialog(response.dialog_name, response.dialog_data, wait=True)
+        self.speak_dialog(
+            response.dialog_name, response.dialog_data, cache_key=cache_key, wait=True
+        )
         if self.platform == MARK_I:
             self._clear_mark_i_display(delay=TEN_SECONDS)
         elif self.gui.connected:
@@ -340,6 +352,35 @@ class TimeSkill(MycroftSkill):
         See note in module-level docstring.
         """
         pass
+
+    def _cache_current_time_tts(self):
+        try:
+            # Re-cache in a minute
+            self.cancel_scheduled_event("CacheTTS")
+
+            now = datetime.now()
+            next_minute = datetime(
+                year=now.year,
+                month=now.month,
+                day=now.day,
+                hour=now.hour,
+                minute=now.minute,
+            ) + timedelta(minutes=1)
+
+            self.schedule_event(
+                self._cache_current_time_tts, when=next_minute, name="CacheTTS"
+            )
+
+            response = Response(self.config_core, self.location_regex_path)
+            response.build_current_time_response("")
+
+            self.cache_dialog(
+                response.dialog_name,
+                response.dialog_data,
+                cache_key=self._current_time_cache_key,
+            )
+        except Exception:
+            self.log.exception("Error while caching TTS")
 
 
 def create_skill():
