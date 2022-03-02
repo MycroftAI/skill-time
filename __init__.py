@@ -90,7 +90,8 @@ class TimeSkill(MycroftSkill):
             self.disable_intent("mark-one-idle")
 
         self._current_time_cache_key = f"{self.skill_id}.current-time"
-        self.schedule_event(self._cache_current_time_tts, when=1, name="CacheTTS")
+
+        self.add_event("mycroft.started", self._cache_current_time_tts)
 
     def _define_event_handlers(self):
         """Define the events this skill will handle and the associated callback."""
@@ -353,7 +354,7 @@ class TimeSkill(MycroftSkill):
         """
         pass
 
-    def _cache_current_time_tts(self):
+    def _cache_current_time_tts(self, _message=None):
         try:
             # Re-cache in a minute
             self.cancel_scheduled_event("CacheTTS")
