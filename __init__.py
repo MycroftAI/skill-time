@@ -91,7 +91,7 @@ class TimeSkill(MycroftSkill):
 
         self._current_time_cache_key = f"{self.skill_id}.current-time"
 
-        self.add_event("mycroft.started", self._cache_current_time_tts)
+        self.add_event("mycroft.ready", self._cache_current_time_tts)
 
     def _define_event_handlers(self):
         """Define the events this skill will handle and the associated callback."""
